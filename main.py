@@ -19,7 +19,7 @@ from typing import Optional
 
 from youtube_downloader import download_youtube_video
 from subtitle_translator import translate_subtitle
-from video_processor import embed_subtitle_to_video, burn_subtitle_to_video
+from video_processor import embed_subtitle_to_video, burn_subtitle_to_video, VideoProcessor
 from config import get_settings
 
 
@@ -38,39 +38,62 @@ def main():
     args = parser.parse_args()
     
     try:
+        print("\n🔧" + "=" * 48 + "🔧")
+        print("🔍 开始检查配置和参数...")
+        print(f"   运行模式: {'仅翻译现有文件' if args.no_download else '完整下载流程'}")
+        print(f"   目标语言: {args.language}")
+        print(f"   字幕类型: {args.embed_type}")
+        print("🔧" + "=" * 48 + "🔧")
+        
         # 检查配置
         settings = get_settings()
         if not settings.openai_api_key or settings.openai_api_key.startswith('your_'):
-            print("错误: 请配置OpenAI API密钥")
+            print("❌ 错误: 请配置OpenAI API密钥")
             print("1. 复制 .env.example 为 .env")
             print("2. 在 .env 文件中设置 OPENAI_API_KEY=你的API密钥")
             sys.exit(1)
         
+        print("✅ 配置检查通过")
+        
         if args.no_download:
             # 仅翻译模式
             if not args.subtitle_file or not args.video_file:
-                print("错误: 在--no-download模式下需要提供--subtitle-file和--video-file参数")
+                print("❌ 错误: 在--no-download模式下需要提供--subtitle-file和--video-file参数")
                 sys.exit(1)
+            
+            print(f"✅ 参数验证通过")
+            print(f"   视频文件: {args.video_file}")
+            print(f"   字幕文件: {args.subtitle_file}")
             
             process_existing_files(args.video_file, args.subtitle_file, args.language, 
                                  args.embed_type, args.output)
         else:
             # 完整下载和翻译流程
+            print(f"✅ 参数验证通过")
+            print(f"   YouTube URL: {args.url}")
+            
             download_and_process(args.url, args.language, args.embed_type, args.output)
             
     except KeyboardInterrupt:
-        print("\n程序被用户中断")
+        print("\n⚠️" + "=" * 48 + "⚠️")
+        print("⚠️ 程序被用户中断")
+        print("⚠️" + "=" * 48 + "⚠️")
         sys.exit(0)
     except Exception as e:
-        print(f"错误: {str(e)}")
+        print("\n❌" + "=" * 48 + "❌")
+        print(f"❌ 程序执行出错: {str(e)}")
+        print("❌" + "=" * 48 + "❌")
         sys.exit(1)
 
 
 def download_and_process(url: str, target_language: str, embed_type: str, output_file: Optional[str]):
     """下载并处理视频"""
-    print("=" * 50)
-    print("开始处理YouTube视频...")
-    print("=" * 50)
+    print("🚀" + "=" * 48 + "🚀")
+    print("🎬 开始处理YouTube视频...")
+    print(f"   URL: {url}")
+    print(f"   目标语言: {target_language}")
+    print(f"   字幕类型: {embed_type}")
+    print("🚀" + "=" * 48 + "🚀")
     
     # 1. 检查文件是否已存在
     from youtube_downloader import YouTubeDownloader
@@ -83,116 +106,185 @@ def download_and_process(url: str, target_language: str, embed_type: str, output
         info = ydl.extract_info(url, download=False)
         video_title = info.get('title', 'video')
     
+    print(f"📺 视频标题: {video_title}")
+    
     # 检查视频文件是否已存在
     video_file = downloader.download_dir / f"{video_title}.mp4"
-    if video_file.exists():
-        print(f"✓ 视频文件已存在: {video_file}")
-        print("提示: 检测到视频文件已存在，跳过下载步骤")
-        
-        # 检查字幕文件
+    
+    # 检查字幕文件
     subtitle_files = list(downloader.download_dir.glob(f"{video_title}.*.vtt"))
     subtitle_files += list(downloader.download_dir.glob(f"{video_title}.*.srt"))
     
-    if subtitle_files:
-        print(f"✓ 找到字幕文件: {[f.name for f in subtitle_files]}")
+    # 检测英文字幕和中文字幕
+    english_subtitle = None
+    chinese_subtitle = None
+    
+    for subtitle_file in subtitle_files:
+        if 'en' in subtitle_file.name and ('zh-CN' not in subtitle_file.name and 'zh-Hans' not in subtitle_file.name):
+            english_subtitle = subtitle_file
+            print(f"✅ 检测到英文字幕: {english_subtitle.name}")
+        elif 'zh-CN' in subtitle_file.name or 'zh-Hans' in subtitle_file.name:
+            chinese_subtitle = subtitle_file
+            print(f"✅ 检测到中文字幕: {chinese_subtitle.name}")
+    
+    # 如果视频文件和英文字幕都存在，跳过下载
+    if video_file.exists() and english_subtitle:
+        print(f"✅ 视频文件已存在: {video_file}")
+        print(f"✅ 英文字幕已存在: {english_subtitle.name}")
+        print("💡 提示: 检测到视频和英文字幕，跳过下载步骤")
         
-        # 智能选择字幕文件：优先选择已翻译的中文字幕
-        selected_subtitle = None
-        
-        # 1. 优先选择已翻译的中文字幕
-        for subtitle_file in subtitle_files:
-            if 'zh-CN' in subtitle_file.name or 'zh-Hans' in subtitle_file.name:
-                selected_subtitle = subtitle_file
-                print(f"✓ 选择已翻译的中文字幕: {selected_subtitle.name}")
-                break
-        
-        # 2. 如果没有中文字幕，选择英文字幕
-        if not selected_subtitle:
-            for subtitle_file in subtitle_files:
-                if 'en' in subtitle_file.name:
-                    selected_subtitle = subtitle_file
-                    print(f"✓ 选择英文字幕: {selected_subtitle.name}")
-                    break
-        
-        # 3. 如果还没有选择，选择第一个字幕文件
-        if not selected_subtitle:
-            selected_subtitle = subtitle_files[0]
-            print(f"✓ 选择字幕文件: {selected_subtitle.name}")
-        
-        # 直接处理现有文件
-        process_existing_files(str(video_file), str(selected_subtitle), target_language, embed_type, output_file)
-        return
+        # 如果中文字幕也存在，跳过翻译
+        if chinese_subtitle:
+            print(f"✅ 中文字幕已存在: {chinese_subtitle.name}")
+            print("💡 提示: 检测到中文字幕，跳过翻译步骤")
+            
+            # 直接处理双语字幕
+            print("🔄 开始处理双语字幕...")
+            process_bilingual_files(str(video_file), str(english_subtitle), str(chinese_subtitle), embed_type, output_file)
+            return
+        else:
+            # 只有英文字幕，需要翻译
+            print("🔄 开始处理现有文件...")
+            process_existing_files(str(video_file), str(english_subtitle), target_language, embed_type, output_file)
+            return
+    
+    # 如果只有视频文件存在，但没有英文字幕，继续下载
+    if video_file.exists():
+        print(f"✅ 视频文件已存在: {video_file}")
+        print("⚠️ 未找到英文字幕，继续下载字幕")
     else:
-        print("⚠ 未找到字幕文件，继续下载流程")
+        print("⚠️ 未找到视频文件，继续下载流程")
     
     # 2. 下载视频和字幕
-    print("开始下载YouTube视频...")
+    print("\n📥 开始下载YouTube视频...")
     download_result = download_youtube_video(url)
-    print(f"✓ 视频下载完成: {download_result['title']}")
-    print(f"✓ 视频文件: {download_result['video_file']}")
+    print(f"✅ 视频下载完成: {download_result['title']}")
+    print(f"✅ 视频文件: {download_result['video_file']}")
     
     # 2. 检查字幕
     if not download_result['subtitles']:
-        print("⚠ 未找到字幕文件，跳过字幕处理")
+        print("⚠️ 未找到字幕文件，跳过字幕处理")
         return
     
-    print(f"✓ 找到字幕文件: {list(download_result['subtitles'].keys())}")
+    print(f"✅ 找到 {len(download_result['subtitles'])} 个字幕文件: {list(download_result['subtitles'].keys())}")
     
-    # 3. 智能字幕选择
-    subtitle_file = None
+    # 3. 简化字幕选择：默认使用英文字幕并翻译
+    english_subtitle_file = None
     
-    # 优先检查是否已有中文字幕
-    chinese_subtitles = []
-    for lang in ['zh', 'zh-Hans', 'zh-Hant', 'zh-CN', 'zh-TW']:
-        if lang in download_result['subtitles']:
-            chinese_subtitles.append((lang, download_result['subtitles'][lang]))
-    
-    if chinese_subtitles:
-        # 使用现有的中文字幕，跳过翻译
-        lang, subtitle_file = chinese_subtitles[0]
-        print(f"✓ 使用现有中文字幕({lang}): {subtitle_file}")
-        print("提示: 检测到中文字幕已存在，跳过翻译步骤")
-    elif 'en' in download_result['subtitles']:
-        # 只有英文字幕时进行翻译
-        print("\n" + "=" * 50)
-        print("开始翻译英文字幕...")
-        print("=" * 50)
-        
-        english_subtitle = download_result['subtitles']['en']
-        subtitle_file = translate_subtitle(english_subtitle, target_language)
-        print(f"✓ 字幕翻译完成: {subtitle_file}")
+    # 优先使用英文字幕
+    if 'en' in download_result['subtitles']:
+        english_subtitle_file = download_result['subtitles']['en']
+        print(f"✅ 使用英文字幕: {english_subtitle_file}")
     else:
-        print("⚠ 没有找到可用的字幕文件")
-        return
+        # 如果没有英文字幕，使用第一个字幕文件
+        first_lang = list(download_result['subtitles'].keys())[0]
+        english_subtitle_file = download_result['subtitles'][first_lang]
+        print(f"✅ 使用字幕文件({first_lang}): {english_subtitle_file}")
+    
+    # 翻译字幕
+    if target_language != 'en':
+        print("\n🌐" + "=" * 46 + "🌐")
+        print("🔤 开始翻译字幕...")
+        print(f"   源语言: 检测到的语言")
+        print(f"   目标语言: {target_language}")
+        print("🌐" + "=" * 46 + "🌐")
+        
+        chinese_subtitle_file = translate_subtitle(english_subtitle_file, target_language)
+        print(f"✅ 字幕翻译完成: {chinese_subtitle_file}")
+    else:
+        chinese_subtitle_file = english_subtitle_file
+        print("💡 提示: 目标语言为英文，无需翻译")
     
     # 4. 合成字幕到视频
-    print("\n" + "=" * 50)
-    print("开始合成字幕到视频...")
-    print("=" * 50)
+    print("\n🎬" + "=" * 46 + "🎬")
+    print("🔧 开始合成字幕到视频...")
+    
+    # 默认使用双语字幕
+    print("💡 默认使用双语字幕")
+    print(f"   中文字幕: {chinese_subtitle_file}")
+    print(f"   英文字幕: {english_subtitle_file}")
+    print("🎬" + "=" * 46 + "🎬")
     
     video_file = download_result['video_file']
+    processor = VideoProcessor()
     
     if embed_type == 'soft':
-        final_video = embed_subtitle_to_video(video_file, subtitle_file, output_file)
-        print(f"✓ 软字幕嵌入完成: {final_video}")
-        print("提示: 软字幕可以在播放器中开关")
+        # 软字幕：创建双语字幕文件
+        print("🔄 创建双语软字幕...")
+        bilingual_subtitle_file = processor.create_bilingual_subtitle_file(
+            chinese_subtitle_file, english_subtitle_file
+        )
+        print(f"✅ 双语字幕文件创建完成: {bilingual_subtitle_file}")
+        final_video = embed_subtitle_to_video(video_file, bilingual_subtitle_file, output_file)
+        print(f"✅ 双语软字幕嵌入完成: {final_video}")
+        print("💡 提示: 软字幕可以在播放器中开关")
     else:
-        final_video = burn_subtitle_to_video(video_file, subtitle_file, output_file)
-        print(f"✓ 硬字幕烧录完成: {final_video}")
-        print("提示: 硬字幕永久嵌入视频中")
+        # 硬字幕：使用双语烧录功能
+        print("🔄 创建双语硬字幕...")
+        final_video = processor.burn_bilingual_subtitle(
+            video_file, chinese_subtitle_file, english_subtitle_file, output_file
+        )
+        print(f"✅ 双语硬字幕烧录完成: {final_video}")
+        print("💡 提示: 中文在上方（大字体），英文在下方（小字体）")
     
-    print("\n" + "=" * 50)
-    print("处理完成!")
-    print("=" * 50)
-    print(f"最终视频文件: {final_video}")
+    print("\n🎉" + "=" * 46 + "🎉")
+    print("✅ 处理完成!")
+    print(f"   最终视频文件: {final_video}")
+    print("🎉" + "=" * 46 + "🎉")
+
+
+def process_bilingual_files(video_file, english_subtitle_file, chinese_subtitle_file, embed_type, output_file):
+    """处理已存在的双语字幕文件"""
+    print(f"🎬 处理视频文件: {video_file}")
+    print(f"📝 英文字幕: {english_subtitle_file}")
+    print(f"📝 中文字幕: {chinese_subtitle_file}")
+    
+    # 合成字幕到视频
+    processor = VideoProcessor()
+    
+    print("\n🎬" + "=" * 46 + "🎬")
+    print("🔧 开始合成双语字幕到视频...")
+    
+    # 默认使用双语字幕
+    print("💡 使用双语字幕")
+    print(f"   中文字幕: {chinese_subtitle_file}")
+    print(f"   英文字幕: {english_subtitle_file}")
+    
+    if embed_type == 'soft':
+        # 软字幕：创建双语字幕文件
+        print("🔄 创建双语软字幕...")
+        bilingual_subtitle_file = processor.create_bilingual_subtitle_file(
+            chinese_subtitle_file, english_subtitle_file
+        )
+        print(f"✅ 双语字幕文件创建完成: {bilingual_subtitle_file}")
+        final_video = embed_subtitle_to_video(video_file, bilingual_subtitle_file, output_file)
+        print(f"✅ 双语软字幕嵌入完成: {final_video}")
+        print("💡 提示: 软字幕可以在播放器中开关")
+    else:
+        # 硬字幕：使用双语烧录功能
+        print("🔄 创建双语硬字幕...")
+        final_video = processor.burn_bilingual_subtitle(
+            video_file, chinese_subtitle_file, english_subtitle_file, output_file
+        )
+        print(f"✅ 双语硬字幕烧录完成: {final_video}")
+        print("💡 提示: 中文在上方（大字体），英文在下方（小字体）")
+    
+    print("\n🎉" + "=" * 46 + "🎉")
+    print("🎉 双语字幕处理完成！")
+    print(f"📁 最终视频文件: {final_video}")
+    print("🎉" + "=" * 46 + "🎉")
 
 
 def process_existing_files(video_file: str, subtitle_file: str, target_language: str, 
                           embed_type: str, output_file: Optional[str]):
     """处理现有文件"""
-    print("=" * 50)
-    print("开始处理现有文件...")
-    print("=" * 50)
+    print("\n📁" + "=" * 46 + "📁")
+    print("🔍 开始处理现有文件...")
+    print(f"   视频文件: {video_file}")
+    print(f"   字幕文件: {subtitle_file}")
+    print(f"   目标语言: {target_language}")
+    print(f"   字幕类型: {embed_type}")
+    print("📁" + "=" * 46 + "📁")
     
     # 检查文件是否存在
     if not Path(video_file).exists():
@@ -200,24 +292,58 @@ def process_existing_files(video_file: str, subtitle_file: str, target_language:
     if not Path(subtitle_file).exists():
         raise FileNotFoundError(f"字幕文件不存在: {subtitle_file}")
     
-    # 翻译字幕（如果需要）
+    print("✅ 文件验证通过")
+    
+    # 简化字幕处理逻辑：默认使用双语字幕
+    subtitle_path = Path(subtitle_file)
+    
+    # 直接假设输入的字幕是英文字幕
+    english_subtitle_file = subtitle_file
+    print(f"✅ 使用英文字幕: {subtitle_file}")
+    
+    # 翻译英文字幕
     if target_language != 'en':
-        print("开始翻译字幕...")
-        subtitle_file = translate_subtitle(subtitle_file, target_language)
-        print(f"✓ 字幕翻译完成: {subtitle_file}")
+        print("\n🌐 开始翻译字幕...")
+        chinese_subtitle_file = translate_subtitle(subtitle_file, target_language)
+        print(f"✅ 字幕翻译完成: {chinese_subtitle_file}")
+    else:
+        chinese_subtitle_file = subtitle_file
+        print("💡 提示: 目标语言为英文，无需翻译")
     
     # 合成字幕到视频
-    if embed_type == 'soft':
-        final_video = embed_subtitle_to_video(video_file, subtitle_file, output_file)
-        print(f"✓ 软字幕嵌入完成: {final_video}")
-    else:
-        final_video = burn_subtitle_to_video(video_file, subtitle_file, output_file)
-        print(f"✓ 硬字幕烧录完成: {final_video}")
+    processor = VideoProcessor()
     
-    print("\n" + "=" * 50)
-    print("处理完成!")
-    print("=" * 50)
-    print(f"最终视频文件: {final_video}")
+    print("\n🎬" + "=" * 46 + "🎬")
+    print("🔧 开始合成字幕到视频...")
+    
+    # 默认使用双语字幕
+    print("💡 默认使用双语字幕")
+    print(f"   中文字幕: {chinese_subtitle_file}")
+    print(f"   英文字幕: {english_subtitle_file}")
+    
+    if embed_type == 'soft':
+        # 软字幕：创建双语字幕文件
+        print("🔄 创建双语软字幕...")
+        bilingual_subtitle_file = processor.create_bilingual_subtitle_file(
+            chinese_subtitle_file, english_subtitle_file
+        )
+        print(f"✅ 双语字幕文件创建完成: {bilingual_subtitle_file}")
+        final_video = embed_subtitle_to_video(video_file, bilingual_subtitle_file, output_file)
+        print(f"✅ 双语软字幕嵌入完成: {final_video}")
+        print("💡 提示: 软字幕可以在播放器中开关")
+    else:
+        # 硬字幕：使用双语烧录功能
+        print("🔄 创建双语硬字幕...")
+        final_video = processor.burn_bilingual_subtitle(
+            video_file, chinese_subtitle_file, english_subtitle_file, output_file
+        )
+        print(f"✅ 双语硬字幕烧录完成: {final_video}")
+        print("💡 提示: 中文在上方（大字体），英文在下方（小字体）")
+    
+    print("\n🎉" + "=" * 46 + "🎉")
+    print("🎉 处理完成！")
+    print(f"📁 最终视频文件: {final_video}")
+    print("🎉" + "=" * 46 + "🎉")
 
 
 if __name__ == "__main__":

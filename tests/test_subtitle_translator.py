@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from subtitle_translator import SubtitleTranslator, translate_subtitle
+from ..subtitle_translator import SubtitleTranslator, translate_subtitle
 
 
 class TestSubtitleTranslator(unittest.TestCase):

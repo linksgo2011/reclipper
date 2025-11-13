@@ -30,15 +30,20 @@ class SubtitleTranslator:
         if target_language is None:
             target_language = self.settings.target_language
         
+        # 生成输出文件路径
+        input_path = Path(subtitle_file)
+        output_file = input_path.parent / f"{input_path.stem}.{target_language}{input_path.suffix}"
+        
+        # 检查翻译文件是否已存在
+        if output_file.exists():
+            print(f"✅ 翻译文件已存在，跳过翻译: {output_file}")
+            return str(output_file)
+        
         # 读取字幕文件
         subtitles = self._read_subtitle_file(subtitle_file)
         
         # 翻译字幕
         translated_subtitles = self._translate_subtitles(subtitles, target_language)
-        
-        # 生成输出文件路径
-        input_path = Path(subtitle_file)
-        output_file = input_path.parent / f"{input_path.stem}.{target_language}{input_path.suffix}"
         
         # 写入翻译后的字幕文件
         self._write_subtitle_file(output_file, translated_subtitles)

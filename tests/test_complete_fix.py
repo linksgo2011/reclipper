@@ -7,7 +7,7 @@
 import json
 import unittest
 from unittest.mock import Mock, patch
-from subtitle_translator import SubtitleTranslator
+from ..subtitle_translator import SubtitleTranslator
 
 class TestCompleteFix(unittest.TestCase):
     def setUp(self):

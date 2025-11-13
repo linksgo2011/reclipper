@@ -6,7 +6,7 @@
 import unittest
 from unittest.mock import Mock, patch
 import json
-from subtitle_translator import SubtitleTranslator
+from ..subtitle_translator import SubtitleTranslator
 
 
 class TestFixedTranslation(unittest.TestCase):

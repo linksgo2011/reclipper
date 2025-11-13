@@ -4,7 +4,7 @@
 """
 
 import json
-from subtitle_translator import SubtitleTranslator
+from ..subtitle_translator import SubtitleTranslator
 
 
 def test_bilingual_translation():

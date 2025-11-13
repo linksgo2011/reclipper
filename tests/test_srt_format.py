@@ -6,7 +6,7 @@
 import os
 import tempfile
 from pathlib import Path
-from subtitle_translator import SubtitleTranslator
+from ..subtitle_translator import SubtitleTranslator
 
 def test_srt_parsing():
     """测试SRT格式解析"""

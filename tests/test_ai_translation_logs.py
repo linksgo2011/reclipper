@@ -7,7 +7,7 @@ import os
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
-from subtitle_translator import SubtitleTranslator
+from ..subtitle_translator import SubtitleTranslator
 
 def test_ai_translation_logs():
     """测试AI翻译日志功能"""

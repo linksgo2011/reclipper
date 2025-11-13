@@ -51,6 +51,11 @@ coverage.xml
 .pytest_cache/
 cover/
 
+# Test generated files
+tests/test_*.mp4
+tests/test_*.srt
+tests/test_*.ass
+
 # Translations
 *.mo
 *.pot

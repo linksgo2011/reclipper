@@ -11,9 +11,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from config import get_settings
-from youtube_downloader import YouTubeDownloader
-from subtitle_translator import SubtitleTranslator
-from video_processor import VideoProcessor
+from ..youtube_downloader import YouTubeDownloader
+from ..subtitle_translator import SubtitleTranslator
+from ..video_processor import VideoProcessor
 
 
 def test_config():

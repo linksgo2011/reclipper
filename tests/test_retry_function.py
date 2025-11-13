@@ -7,7 +7,7 @@ import os
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
-from subtitle_translator import SubtitleTranslator
+from ..subtitle_translator import SubtitleTranslator
 
 def test_retry_success():
     """测试重试成功的情况"""

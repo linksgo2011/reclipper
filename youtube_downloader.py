@@ -136,8 +136,8 @@ class YouTubeDownloader:
         # 可能的字幕文件扩展名
         subtitle_extensions = ['.srt', '.vtt', '.ass']
         
-        # 清理文件名中的特殊字符
-        safe_title = re.sub(r'[<>:"/\\|?*]', '_', video_title)
+        # 清理文件名中的特殊字符，包括全角符号
+        safe_title = re.sub(r'[<>:"/\\|?*｜]', '_', video_title.replace('｜', '|'))
         
         for ext in subtitle_extensions:
             # 查找英文字幕
@@ -151,10 +151,11 @@ class YouTubeDownloader:
                 if subtitle_file.exists():
                     subtitle_files[lang] = str(subtitle_file)
         
-        # 如果没找到，尝试原始文件名
+        # 如果没找到，尝试原始文件名（也替换全角符号）
         if not subtitle_files:
+            original_title = video_title.replace('｜', '|')
             for ext in subtitle_extensions:
-                subtitle_file = self.download_dir / f"{video_title}.en{ext}"
+                subtitle_file = self.download_dir / f"{original_title}.en{ext}"
                 if subtitle_file.exists():
                     subtitle_files['en'] = str(subtitle_file)
         

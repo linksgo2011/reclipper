@@ -7,7 +7,7 @@ import os
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
-from subtitle_translator import SubtitleTranslator
+from ..subtitle_translator import SubtitleTranslator
 
 def test_translation_line_matching():
     """测试翻译行数匹配功能"""

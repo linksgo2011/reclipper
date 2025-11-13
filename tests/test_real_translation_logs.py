@@ -7,7 +7,7 @@ import os
 import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
-from subtitle_translator import SubtitleTranslator
+from ..subtitle_translator import SubtitleTranslator
 
 def test_real_translation_with_logs():
     """实际测试翻译过程中的日志输出"""
